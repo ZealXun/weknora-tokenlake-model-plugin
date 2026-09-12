@@ -1,0 +1,80 @@
+name: Publish plugin image
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Check out WeKnora SDK
+        uses: actions/checkout@v4
+        with:
+          repository: xyz2781790037/WeKnora
+          ref: feat/plugin-framework
+          path: WeKnora
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache-dependency-path: plugin/go.sum
+
+      - name: Verify tag and manifest version
+        working-directory: plugin
+        run: |
+          manifest_version="$(awk '/^  version:/{print $2; exit}' plugin.yaml)"
+          test "v${manifest_version}" = "${GITHUB_REF_NAME}"
+
+      - name: Check compatibility
+        working-directory: WeKnora
+        run: >-
+          go run ./cmd/pluginctl compat
+          --manifest ../plugin/plugin.yaml
+          --weknora-version 0.2.0
+
+      - name: Run tests
+        working-directory: plugin
+        run: go test ./...
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/zealxun/weknora-tokenlake-model-plugin
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and publish
+        uses: docker/build-push-action@v6
+        with:
+          context: plugin
+          file: plugin/Dockerfile
+          build-contexts: |
+            weknora=./WeKnora
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

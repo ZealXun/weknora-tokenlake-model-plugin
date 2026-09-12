@@ -1,0 +1,44 @@
+apiVersion: weknora.io/v1
+kind: Plugin
+metadata:
+  id: io.weknora.model.tokenlake
+  name: TokenLake Model Provider
+  description: 通过芯元无界 OpenAI 兼容 API 提供文本对话模型
+  version: 0.1.0
+spec:
+  protocolVersion: 1.0.0
+  weknoraVersion: ">=0.2.0"
+  image: ghcr.io/zealxun/weknora-tokenlake-model-plugin:0.1.0
+  types:
+    - model_provider
+  capabilities:
+    - chat
+  icon: chat
+  defaultTimeout: 2m
+  config:
+    schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      additionalProperties: false
+      properties:
+        api_key:
+          type: string
+          title: 芯元无界 API Key
+          description: 在芯元无界控制台的 API Keys 页面创建
+          minLength: 1
+      required:
+        - api_key
+    secretFields:
+      - api_key
+  permissions:
+    network: true
+    allowedHosts:
+      - tokenlake.com.cn
+    dataAccess:
+      - conversation
+  resources:
+    memoryBytes: 268435456
+    nanoCPUs: 500000000
+    pidsLimit: 64
+    maxConcurrency: 4
+    callsPerMinute: 120
